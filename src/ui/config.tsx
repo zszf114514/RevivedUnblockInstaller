@@ -1,11 +1,12 @@
 import Notiflix from "notiflix";
-import { SourcesPreset, OtherSettings, applyProxyConfig, checkAndExecuteUnblock, stopUNMProcesses } from "../unblock";
+import { SourcesPreset, OtherSettings, applyProxyConfig, checkAndExecuteUnblock, stopUNMProcesses, activeSourceOrder } from "../unblock";
 import { LocalJSONConfig } from "../utils/config"
 import { RoundedRectButton } from "./RoundRectBtn";
 import { VersionSelector } from "./VersionSelector";
 import { readUrlFile } from "../utils/network";
 import { Input } from "./Input"
 import { BadgeList } from "./Badge";
+import { QrLogin } from "./QrLogin";
 
 function OtherSetting({ config }: { config: LocalJSONConfig }) {
     const settings = config.getConfig("other-settings", OtherSettings);
@@ -43,7 +44,7 @@ function OtherSetting({ config }: { config: LocalJSONConfig }) {
 }
 
 function SourceOrder({ config }: { config: LocalJSONConfig }) {
-    const order = config.getConfig("source-order", SourcesPreset);
+    const order = activeSourceOrder(config.getConfig("source-order", SourcesPreset));
     const [badges, setBadges] = React.useState(order);
 
     const handleBadgeClick = (index) => {
@@ -196,11 +197,50 @@ export function Config({ config, stylesheet }: { config: LocalJSONConfig, styles
                     <div style={{ padding: "15px" }}>
                         <SourceOrder config={config} />
                         {
-                            config.getConfig("source-order", SourcesPreset).find(v => v.code === "qq" && v.enable) && (
-                                <Input label="QQ音乐 Cookies" placeholder="QQ 音源的 uin 和 qm_keyst Cookie。必须使用 QQ 登录。" onChange={e => {
-                                    config.setConfig("qq-cookie", e.target.value);
-                                    config.write();
-                                }} defaultValue={config.getConfig("qq-cookie", "")} />
+                            activeSourceOrder(config.getConfig("source-order", SourcesPreset)).find(v => v.code === "qq" && v.enable) && (
+                                <>
+                                    <QrLogin
+                                        login={{ kind: "qq" }}
+                                        label="微信扫码"
+                                        hint="插件的扫码登录。用微信扫码并确认，登录绑定了该微信的 QQ 音乐账号。写入 uin、qm_keyst 和服务端返回的 tmeLoginType。"
+                                        onCookie={cookie => {
+                                            config.setConfig("qq-cookie", cookie);
+                                            config.write();
+                                        }}
+                                    />
+                                    <button type="button" className="btn" onClick={() => betterncm.ncm.openUrl("https://y.qq.com/portal/profile.html")}>打开官方登录页</button>
+                                    <div className="note">插件的网页登录。用 QQ 或微信登录后，从 y.qq.com 请求头复制含 qm_keyst 的 Cookie 粘贴到下面。</div>
+                                    <Input label="QQ音乐 Cookies" placeholder="uin=; qm_keyst=; tmeLoginType=" onChange={e => {
+                                        config.setConfig("qq-cookie", e.target.value);
+                                        config.write();
+                                    }} defaultValue={config.getConfig("qq-cookie", "")} />
+                                </>
+                            )
+                        }
+                        {
+                            activeSourceOrder(config.getConfig("source-order", SourcesPreset)).find(v => v.code === "kugou" && v.enable) && (
+                                <QrLogin
+                                    login={{ kind: "kugou", edition: "standard" }}
+                                    label="酷狗标准版扫码"
+                                    hint="用酷狗音乐正式版扫。不要用概念版。"
+                                    onCookie={cookie => {
+                                        config.setConfig("kugou-cookie", cookie);
+                                        config.write();
+                                    }}
+                                />
+                            )
+                        }
+                        {
+                            activeSourceOrder(config.getConfig("source-order", SourcesPreset)).find(v => v.code === "kugouconcept" && v.enable) && (
+                                <QrLogin
+                                    login={{ kind: "kugou", edition: "concept" }}
+                                    label="酷狗概念版扫码"
+                                    hint="用酷狗概念版扫。token 只给概念版音源用。"
+                                    onCookie={cookie => {
+                                        config.setConfig("kugou-concept-cookie", cookie);
+                                        config.write();
+                                    }}
+                                />
                             )
                         }
                         {

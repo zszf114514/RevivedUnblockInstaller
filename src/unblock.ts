@@ -19,6 +19,8 @@ interface UNMEnvironmentVariables {
     JOOX_COOKIE?: string;
     MIGU_COOKIE?: string;
     QQ_COOKIE?: string;
+    KUGOU_COOKIE?: string;
+    KUGOU_CONCEPT_COOKIE?: string;
     YOUTUBE_KEY?: string;
     SIGN_CERT?: string;
     SIGN_KEY?: string;
@@ -33,7 +35,7 @@ const generateEnvironmentVariablesCommandLine = (env: UNMEnvironmentVariables) =
             value !== undefined &&
             value.toString().length > 0
         ) {
-            command += `set ${key}=${value}&& `;
+            command += `set "${key}=${String(value).replace(/"/g, "")}"&& `;
         }
     }
     return command.slice(0, -4);
@@ -72,12 +74,16 @@ function generateCommandLine(args: UNMArguments): string {
 export const startUNM = async (binaryPath: string, port: number, env: UNMEnvironmentVariables, visible: boolean = false, args: UNMArguments) => {
     args["port"] = `${port}:${port + 1}`;
     const command = `cmd /c ${generateEnvironmentVariablesCommandLine(env)} && ${await betterncm.app.getDataPath()}${binaryPath} ${generateCommandLine(args)}`;
-    console.log("Launching UNM: ", command, {
+    console.log("Launching UNM", {
         visible,
         binaryPath,
         port,
-        env,
-        args
+        sources: args.matchOrder,
+        cookies: {
+            QQ_COOKIE: Boolean(env.QQ_COOKIE),
+            KUGOU_COOKIE: Boolean(env.KUGOU_COOKIE),
+            KUGOU_CONCEPT_COOKIE: Boolean(env.KUGOU_CONCEPT_COOKIE),
+        },
     });
     betterncm.app.exec(command, false, visible);
 }
@@ -91,7 +97,7 @@ export async function installAndLaunchUnblock(port: number, config: LocalJSONCon
     }
     const binaryPath = `./RevivedUnblockInstaller/${selectedVersion.filename}`;
     if (betterncm_native.fs.exists(binaryPath)) {
-        const order = config.getConfig("source-order", SourcesPreset);
+        const order = activeSourceOrder(config.getConfig("source-order", SourcesPreset));
         const other = config.getConfig("other-settings", OtherSettings);
 
         startUNM(binaryPath, port, {
@@ -103,13 +109,14 @@ export async function installAndLaunchUnblock(port: number, config: LocalJSONCon
             ENABLE_FLAC: other.find(v => v.code === "ENABLE_FLAC")?.enable || false,
             FOLLOW_SOURCE_ORDER: other.find(v => v.code === "FOLLOW_SOURCE_ORDER").enable,
             QQ_COOKIE: config.getConfig("qq-cookie", ""),
+            KUGOU_COOKIE: config.getConfig("kugou-cookie", ""),
+            KUGOU_CONCEPT_COOKIE: config.getConfig("kugou-concept-cookie", ""),
             YOUTUBE_KEY: config.getConfig("youtube-key", ""),
             MIGU_COOKIE: config.getConfig("migu-cookie", ""),
             JOOX_COOKIE: config.getConfig("joox-cookie", ""),
             NETEASE_COOKIE: config.getConfig("netease-cookie", ""),
         }, config.getConfig("visible", false), {
-            proxyUrl: config.getConfig("upstream-proxy", ""),
-            matchOrder: order.filter(v => v.enable).map(v => v.code),
+            matchOrder: order.filter(v => v.enable && ActiveSourceCodes.includes(v.code)).map(v => v.code),
         });
     } else {
         if (selectedVersion.installed) {
@@ -265,58 +272,26 @@ export const OtherSettings = [
     },
 ];
 
+export const ActiveSourceCodes = ["qq", "kugou", "kugouconcept", "bilibili", "ytdlp"];
+
 export const SourcesPreset = [
     {
         "name": "QQ 音乐",
         "code": "qq",
         "enable": true,
-        "note": "需要准备自己的 QQ_COOKIE（请参阅下方〈环境变量〉处）。必须使用 QQ 登录。"
+        "note": "扫码登录拿到的 uin 和 qm_keyst。微信扫码即可。"
     },
     {
-        "name": "酷狗音乐",
+        "name": "酷狗标准版",
         "code": "kugou",
-        "enable": true
-    },
-    {
-        "name": "酷我音乐",
-        "code": "kuwo",
-        "enable": true
-    },
-    {
-        "name": "咪咕音乐",
-        "code": "migu",
         "enable": true,
-        "note": "需要准备自己的 MIGU_COOKIE（请参阅下方〈环境变量〉处）。"
+        "note": "appid 1005。用酷狗音乐正式版扫码。"
     },
     {
-        "name": "JOOX",
-        "code": "joox",
-        "enable": false,
-        "note": "需要准备自己的 JOOX_COOKIE（请参阅下方〈环境变量〉处）。似乎有严格地区限制。"
-    },
-    {
-        "name": "YouTube（纯 JS 解析方式）",
-        "code": "youtube",
-        "enable": false,
-        "note": "需要 Google 认定的非中国大陆区域 IP 地址。"
-    },
-    {
-        "name": "yt-download",
-        "code": "ytdownload",
-        "enable": false,
-        "note": "似乎不能使用。"
-    },
-    {
-        "name": "YouTube（通过 youtube-dl）",
-        "code": "youtubedl",
+        "name": "酷狗概念版",
+        "code": "kugouconcept",
         "enable": true,
-        "note": "需要自行安装 youtube-dl。"
-    },
-    {
-        "name": "YouTube（通过 yt-dlp）",
-        "code": "ytdlp",
-        "enable": true,
-        "note": "需要自行安装 yt-dlp（youtube-dl 仍在活跃维护的 fork）。"
+        "note": "appid 3116。用酷狗概念版扫码。token 不能和标准版混用。"
     },
     {
         "name": "B 站音乐",
@@ -324,8 +299,15 @@ export const SourcesPreset = [
         "enable": true
     },
     {
-        "name": "第三方网易云 API",
-        "code": "pyncmd",
-        "enable": false
-    }
+        "name": "YouTube（通过 yt-dlp）",
+        "code": "ytdlp",
+        "enable": true,
+        "note": "需要自行安装 yt-dlp。"
+    },
 ];
+
+export function activeSourceOrder(saved = SourcesPreset) {
+    const byCode: Record<string, typeof SourcesPreset[number]> = {};
+    saved.forEach(item => { byCode[item.code] = item; });
+    return SourcesPreset.map(preset => byCode[preset.code] || preset);
+}
