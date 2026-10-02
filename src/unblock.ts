@@ -22,6 +22,7 @@ interface UNMEnvironmentVariables {
     KUGOU_COOKIE?: string;
     KUGOU_CONCEPT_COOKIE?: string;
     YOUTUBE_KEY?: string;
+    YT_DLP_PATH?: string;
     SIGN_CERT?: string;
     SIGN_KEY?: string;
     SEARCH_ALBUM?: boolean;
@@ -112,6 +113,7 @@ export async function installAndLaunchUnblock(port: number, config: LocalJSONCon
             KUGOU_COOKIE: config.getConfig("kugou-cookie", ""),
             KUGOU_CONCEPT_COOKIE: config.getConfig("kugou-concept-cookie", ""),
             YOUTUBE_KEY: config.getConfig("youtube-key", ""),
+            YT_DLP_PATH: config.getConfig("yt-dlp-path", ""),
             MIGU_COOKIE: config.getConfig("migu-cookie", ""),
             JOOX_COOKIE: config.getConfig("joox-cookie", ""),
             NETEASE_COOKIE: config.getConfig("netease-cookie", ""),
@@ -233,6 +235,23 @@ export async function checkAndExecuteUnblock(config: LocalJSONConfig) {
 
 export const stopUNMProcesses = async () =>
     await betterncm.app.exec(`taskkill /f /fi """"IMAGENAME eq UnblockNeteaseMusic-*""""`);
+
+export async function detectYtDlp(): Promise<{ ok: boolean, path: string }> {
+    const dataPath = await betterncm.app.getDataPath();
+    await betterncm.fs.mkdir("./RevivedUnblockInstaller");
+    const out = `${dataPath}\\RevivedUnblockInstaller\\yt-dlp-which.txt`;
+    await betterncm.app.exec(`cmd /c "where yt-dlp > ""${out}"" 2>nul || echo MISSING> ""${out}"""`);
+    await betterncm.utils.delay(700);
+    let text = "";
+    try {
+        text = await betterncm.fs.readFileText("./RevivedUnblockInstaller/yt-dlp-which.txt");
+    } catch {
+        text = "";
+    }
+    const line = text.split(/\r?\n/).map(item => item.trim()).find(item => item && item !== "MISSING" && !item.toLowerCase().startsWith("info:"));
+    if (!line) return { ok: false, path: "" };
+    return { ok: true, path: line };
+}
 
 export const OtherSettings = [
     // {

@@ -1,5 +1,5 @@
 import Notiflix from "notiflix";
-import { SourcesPreset, OtherSettings, applyProxyConfig, checkAndExecuteUnblock, stopUNMProcesses, activeSourceOrder } from "../unblock";
+import { SourcesPreset, OtherSettings, applyProxyConfig, checkAndExecuteUnblock, stopUNMProcesses, activeSourceOrder, detectYtDlp } from "../unblock";
 import { LocalJSONConfig } from "../utils/config"
 import { RoundedRectButton } from "./RoundRectBtn";
 import { VersionSelector } from "./VersionSelector";
@@ -81,6 +81,7 @@ function SourceOrder({ config }: { config: LocalJSONConfig }) {
 
 export function Config({ config, stylesheet }: { config: LocalJSONConfig, stylesheet: string }) {
     const [configRefresher, setRefresher] = React.useState(0);
+    const [ytDlp, setYtDlp] = React.useState({ ok: false, path: "检测中" });
 
     const [installedVersions, setInstalledVersions] = React.useState([]);
     const [onlineVersions, setOnlineVersions] = React.useState([]);
@@ -95,7 +96,7 @@ export function Config({ config, stylesheet }: { config: LocalJSONConfig, styles
                 return file.replace("UnblockNeteaseMusic-", "").replace(".exe", "");
             });
             setInstalledVersions(versions);
-            const latestVersion = await fetch("https://api.github.com/repos/UnblockNeteaseMusic/server/releases/latest")
+            const latestVersion = await fetch("https://api.github.com/repos/zszf114514/server/releases/latest")
                 .then(v => v.json());
 
             const asset = latestVersion.assets.find(asset => asset.name.includes("win-x64"));
@@ -116,6 +117,16 @@ export function Config({ config, stylesheet }: { config: LocalJSONConfig, styles
                 download_url: "https://mirror.ghproxy.com/" + asset.browser_download_url
             }]);
         })()
+    }, []);
+
+    React.useEffect(() => {
+        detectYtDlp().then(result => {
+            setYtDlp({ ok: result.ok, path: result.ok ? result.path : "未安装" });
+            if (result.ok) {
+                config.setConfig("yt-dlp-path", result.path);
+                config.write();
+            }
+        }).catch(() => setYtDlp({ ok: false, path: "检测失败" }));
     }, []);
 
     React.useEffect(() => {
@@ -194,6 +205,7 @@ export function Config({ config, stylesheet }: { config: LocalJSONConfig, styles
                     }} defaultValue={config.getConfig("upstream-proxy", "")} />
 
                     <span className="label">音源设置</span>
+                    <div className="note">yt-dlp：{ytDlp.path}</div>
                     <div style={{ padding: "15px" }}>
                         <SourceOrder config={config} />
                         {
@@ -293,8 +305,8 @@ export function Config({ config, stylesheet }: { config: LocalJSONConfig, styles
                         不建议进行大型宣发，传播。
                     </div>
                     <div className="optionSubtitle">点点 Star ⭐</div>
-                    <button style={{ margin: "10px 5px" }} className="btn" onClick={() => betterncm.ncm.openUrl('https://github.com/UnblockNeteaseMusic/server')}>解灰源项目</button>
-                    <button style={{ margin: "10px 5px" }} className="btn" onClick={() => betterncm.ncm.openUrl('https://github.com/ReviveUnblockNCMInstaller/RevivedUnblockInstaller')}>一键安装器（本项目）</button>
+                    <button style={{ margin: "10px 5px" }} className="btn" onClick={() => betterncm.ncm.openUrl('https://github.com/zszf114514/server')}>解灰源项目</button>
+                    <button style={{ margin: "10px 5px" }} className="btn" onClick={() => betterncm.ncm.openUrl('https://github.com/zszf114514/RevivedUnblockInstaller')}>一键安装器（本项目）</button>
                 </div>
             </RoundedRectButton>
             <style>
